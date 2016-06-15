@@ -1,0 +1,4 @@
+*.wav binary
+*.h5f binary
+*.npy binary
+*.npz binary
