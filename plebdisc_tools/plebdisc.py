@@ -7,8 +7,8 @@ import numba as nb
 import tempfile
 import os
 import h5py
-import gmpy
 import itertools
+from corpus import get_speaker
 
 
 binpath='/home/roland/LSCP/spkterm/ArenJensen'
@@ -147,10 +147,6 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
                 except KeyError:
                     res[spk] = {fi: {'sig': sigfile, 'fea': featfile}}
     return res
-
-
-def get_speaker(fname):
-    return fname[:3]
 
 
 import multiprocessing
