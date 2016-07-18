@@ -17,16 +17,16 @@ dotkws.o: dotkws.c dotkws.h Makefile
 	gcc ${OPT} -c dotkws.c
 
 plebdisc: plebdisc.c dot.o feat.o util.o Makefile score_matches.c signature.c
-	gcc ${OPT} -o plebdisc score_matches.c plebdisc.c signature.c -lm util.o dot.o feat.o 
+	gcc ${OPT} -o plebdisc score_matches.c plebdisc.c signature.c -lm util.o dot.o feat.o -lm
 
 plebkws: plebkws.c dotkws.o feat.o util.o Makefile score_matches.c signature.c
 	gcc ${OPT} -D INDEXMODE -o plebkws score_matches.c plebkws.c signature.c -lm util.o dotkws.o feat.o 
 
 build_index: build_index.c dot.o util.o Makefile signature.c
-	gcc ${OPT} -D INDEXMODE -o build_index build_index.c -lm util.o signature.c
+	gcc ${OPT} -D INDEXMODE -o build_index build_index.c -lm util.o signature.c -lm
 
 genproj: Makefile genproj.c util.o
-	gcc ${OPT}  -o genproj genproj.c -lm util.o 
+	gcc ${OPT}  -o genproj genproj.c -lm util.o -lm
 
 lsh: Makefile lsh.c util.o
 	gcc ${OPT}  -o lsh lsh.c util.o -lm 

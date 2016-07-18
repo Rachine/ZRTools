@@ -11,8 +11,8 @@ import itertools
 from corpus import get_speaker
 
 
-binpath='/home/roland/LSCP/spkterm/ArenJensen'
-
+#binpath='/home/roland/LSCP/spkterm/ArenJensen'
+binpath='../ZRTools/plebdisc'
 
 class fdict(dict):
     def __init__(self, *args, **kwargs):
@@ -89,7 +89,7 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     def aux(f, feats, S, D, featfile, sigfile, vadfile=None, vad=None):
         with open(featfile, 'wb') as fout:
             fout.write(feats.tobytes())
-        command = '{}/lsh -S {} -projfile proj_b{}xd{}_seed1 -featfile {} -sigfile {}'.format(binpath, S, S, D, featfile, sigfile)
+        command = '{}/lsh -S {} -D {} -projfile proj_b{}xd{}_seed1 -featfile {} -sigfile {}'.format(binpath, S, D, S, D, featfile, sigfile)
         if vadfile:
             with open(vadfile, 'w') as fout:
                 for interval in vad[f]:
@@ -98,20 +98,22 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         subprocess.check_output([command], shell=True)
 
     vad = {}
-    with open(with_vad) as fin:
-        for line in fin:
-            fname, start, end = line.strip().split()
-            start, end = map(lambda t: int(float(t) * 100), (start, end))
-            try:
-                vad[fname].append((start, end))
-            except KeyError:
-                vad[fname] = [(start, end)]
-    print(vad['s0102a_18'])
+    if with_vad:
+        with open(with_vad) as fin:
+            for line in fin:
+                fname, start, end = line.strip().split()
+                start, end = map(lambda t: int(float(t) * 100), (start, end))
+                try:
+                    vad[fname].append((start, end))
+                except KeyError:
+                    vad[fname] = [(start, end)]
     D = h5py.File(features_file)['features']['features'].shape[1]
     subprocess.check_output(['{}/genproj -D {} -S {} -seed 1'.format(binpath, D, S)], shell=True)
     res = fdict()
     res.stats['S'] = S
     res.stats['D'] = D
+    if not os.path.exists(featsdir):
+        os.makedirs(featsdir)
     if files == None:
         files = h5features.read(features_file)[0].keys()
     for f in files:
@@ -201,7 +203,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 subprocess.check_call([command], shell=True, stdout=fout)
                 if rescoring:
                     feafile1, feafile2 = files[spk][f1]['fea'], files[spk][f2]['fea']
-                    command = '{}/rescore_dtw -D {} -file1 {} -file2 {} -matchlist {}'.format(binpath, files.stats['D'], feafile1, feafile2, tmpfile)
+                    command = '{}/rescore_singlepair_dtw -D {} -file1 {} -file2 {} -matchlist {}'.format(binpath, files.stats['D'], feafile1, feafile2, tmpfile)
                     subprocess.check_call([command], shell=True, stdout=fout_rescore)
                 os.close(fout)
                 os.close(fout_rescore)

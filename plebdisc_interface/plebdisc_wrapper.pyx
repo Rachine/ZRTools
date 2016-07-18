@@ -20,7 +20,7 @@ cdef extern from "stdint.h" nogil:
 
 
 # in the test, we need to make sure that here struct == packed struct
-cdef extern from "dot.h":
+cdef extern from "../ZRTools/plebdisc/dot.h":
     ctypedef struct DotXV:
         int xp
         float val

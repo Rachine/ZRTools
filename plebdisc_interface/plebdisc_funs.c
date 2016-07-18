@@ -2,10 +2,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "dot.h"
-#include "feat.h"
-#include "signature.h"
-#include "util.h"
+#include "../ZRTools/plebdisc/dot.h"
+#include "../ZRTools/plebdisc/feat.h"
+#include "../ZRTools/plebdisc/signature.h"
+#include "../ZRTools/plebdisc/util.h"
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <stdint.h>

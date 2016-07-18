@@ -46,6 +46,7 @@ float castthr = 7;
 int R = 10; 
 float trimthr = 0.25;
 
+char *dump_matchlistf = NULL;
 
 void usage()
 {
@@ -102,6 +103,9 @@ void parse_args(int argc, char **argv)
      else if ( strcmp(argv[i], "-twopass") == 0 ) twopass = atoi(argv[++i]);
      else if ( strcmp(argv[i], "-dtwscore") == 0 ) dtwscore = atoi(argv[++i]);
      else if ( strcmp(argv[i], "-kws") == 0 ) kws = atoi(argv[++i]);
+     else if ( strcmp(argv[i], "-dump-matchlist") == 0 ) {
+       dump_matchlistf = argv[++i];
+     }
      else {
        fprintf(stderr, "unknown arg: %s\n", argv[i]);
        usage();
@@ -257,6 +261,21 @@ int main(int argc, char **argv)
    Match * matchlist = (Match*) MALLOC(MAXMATCHES*sizeof(Match));
    int matchcnt = compute_matchlist( Nmax, radixdots_mf, dotcnt, cumsum_mf, rholist, rhoampl, rhocnt, dx, dy, diffspeech, matchlist );
    fprintf(stderr, "%f s\n",toc());
+
+   if ( dump_matchlistf ) {
+     fprintf(stderr, "Writing matchlist: "); tic();
+     FILE *matchlist_fileptr;
+     matchlist_fileptr = fopen(dump_matchlistf, "wb");
+     for (int i = 0; i < matchcnt; i++ ) {
+       fwrite(&matchlist[i].xA, sizeof(int), 1, matchlist_fileptr);
+       fwrite(&matchlist[i].xB, sizeof(int), 1, matchlist_fileptr);
+       fwrite(&matchlist[i].yA, sizeof(int), 1, matchlist_fileptr);
+       fwrite(&matchlist[i].yB, sizeof(int), 1, matchlist_fileptr);
+       fwrite(&matchlist[i].rhoampl, sizeof(float), 1,matchlist_fileptr);
+       fwrite(&matchlist[i].score, sizeof(float), 1,matchlist_fileptr);
+     }
+     fclose(matchlist_fileptr);
+   }
 
    int lastmc = matchcnt;
    fprintf(stderr,"    Found %d matches in first pass\n",lastmc);
