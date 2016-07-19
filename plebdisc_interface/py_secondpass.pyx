@@ -32,7 +32,7 @@ cdef int MIN_LEN = 4
 
 
 @cython.boundscheck(False)
-def secondpass(np.ndarray[Match, ndim=1] matchlist, np.ndarray[ndim=2] feats1, np.ndarray[ndim=2] feats2, int R, float castthr, float trimthr, int strategy, int nbest=5, bool exact=False):
+def secondpass(np.ndarray[Match, ndim=1] matchlist, np.ndarray feats1, np.ndarray feats2, int R, float castthr, float trimthr, int strategy, int nbest=5, bool exact=False):
     cdef np.ndarray[Match, ndim=2] new_matchlist = np.zeros((matchlist.shape[0], nbest**2,), dtype=[('xA', 'i4'), ('xB', 'i4'), ('yA', 'i4'), ('yB', 'i4'), ('rhoampl', 'f4'), ('score', 'f4')])
     cdef int n_matches = 0
     cdef float ALPHA = 0.5
@@ -219,7 +219,7 @@ cdef sig_find_paths_aren_exact(np.ndarray[float, ndim=2] feats1, np.ndarray[floa
 # @cython.wraparound(False)
 @cython.boundscheck(False)
 @cython.cdivision(True)
-cdef np.ndarray[int, ndim=2] sig_find_paths(np.ndarray[ndim=2] feats1, np.ndarray[ndim=2] feats2, int direction, int xM, int yM, float castthr, float trimthr, int R, int strategy, float alpha, int nbest, bool exact):
+cdef np.ndarray[int, ndim=2] sig_find_paths(np.ndarray feats1, np.ndarray feats2, int direction, int xM, int yM, float castthr, float trimthr, int R, int strategy, float alpha, int nbest, bool exact):
 
     cdef float bound = 1e10
     cdef np.ndarray[float, ndim=2] scr = np.ones((SPHW+1, SPHW+1), dtype=np.float32) * bound
@@ -241,12 +241,11 @@ cdef np.ndarray[int, ndim=2] sig_find_paths(np.ndarray[ndim=2] feats1, np.ndarra
     cdef int nbytes = feats1.shape[1]
     cdef int x, y
 
-    if exact:
-        cdef np.ndarray[float, ndim=1] featx
-        cdef np.ndarray[float, ndim=1] featy
-    else:
-        cdef byte* featx
-        cdef byte* featy
+    cdef np.ndarray[float, ndim=1] featx
+    cdef np.ndarray[float, ndim=1] featy
+
+    cdef byte* featx_approx
+    cdef byte* featy_approx
     
     cdef int n_elt = 1
     cdef np.ndarray[float, ndim=2] elts = np.empty(((SPHW+1)**2, 2), dtype=np.float32)
@@ -274,12 +273,12 @@ cdef np.ndarray[int, ndim=2] sig_find_paths(np.ndarray[ndim=2] feats1, np.ndarra
                 else:
                     subst_cost = cosine(featx, featy)
             else:
-                featx = <byte*> (feats1.data + x*nbytes*sizeof(byte))
-                featy = <byte*> (feats2.data + y*nbytes*sizeof(byte))
-                if signature_is_zeroed(featx, nbytes) or signature_is_zeroed(featy, nbytes):
+                featx_approx = <byte*> (feats1.data + x*nbytes*sizeof(byte))
+                featy_approx = <byte*> (feats2.data + y*nbytes*sizeof(byte))
+                if signature_is_zeroed(featx_approx, nbytes) or signature_is_zeroed(featy_approx, nbytes):
                     subst_cost = -1
                 else:
-                    subst_cost = approximate_cosine(featx, featy, nbytes)
+                    subst_cost = approximate_cosine(featx_approx, featy_approx, nbytes)
 
             subst_cost = (1-subst_cost)/2
 
