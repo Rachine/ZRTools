@@ -82,7 +82,7 @@ def load_matches(matchfile):
     FILE1, FILE2 = os.path.basename(matchfile).split(".")[0].split()
     matchlist = ds.read_matchlist(matchfile)
     dotlist = ds.matchlist_getmiddles(matchlist)
-    res = np.empty((len(dotlist),), dtype=[('f1', '|S12'), ('t1', 'f4'), ('f2', '|S12'), ('t2', 'f4')])
+    res = np.empty((len(dotlist),), dtype=[('f1', '|S30'), ('t1', 'f4'), ('f2', '|S30'), ('t2', 'f4')])
     res['f1'] = FILE1
     res['f2'] = FILE2
     res['t1'] = dotlist['x'].astype(float)/100

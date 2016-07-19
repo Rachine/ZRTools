@@ -1,7 +1,6 @@
 from os.path import join as pjoin
 import os
 import multiprocessing
-import sys
 import precision_match as pm
 import argparse
 
@@ -33,14 +32,16 @@ def run_wrapper(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'matches_dir', metavar='MATCHES_FOLDER', nargs=1,
+        'matches_dir', metavar='MATCHES_FOLDER',
         help='folder containing the match files')
     parser.add_argument(
-        'gold', metavar='GOLD_ANNOTATIONS', nargs=1,
+        'gold', metavar='GOLD_ANNOTATIONS',
         help='gold annotation in .phn format (see tde)')
     parser.add_argument(
         '-j', metavar='N_CORES', type=int, default=1,
         help='number of cores to use')
+
+    return vars(parser.parse_args())
 
 
 if __name__ == "__main__":
@@ -62,4 +63,5 @@ if __name__ == "__main__":
 
     corrects = sum(r[0] for r in res)
     total = sum(r[1] for r in res)
+    print total
     print float(corrects) / total, total

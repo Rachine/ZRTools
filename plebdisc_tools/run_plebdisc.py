@@ -21,6 +21,7 @@ def prepare(feats_file, feats_dir, vad_file=None):
 def run(files, percentile, vad_file, matches_dir):
     T = p.compute_percentile_param(percentile, files, 'within',
                                    with_vad=vad_file, lsh=True)
+    # TODO B=10*duration (or maybe 5*duration)
     p.launch_plebdisc(files, '/dev/null', within=True,
                       B=50, T=T, castthr=T, dump_matchlist=matches_dir)    
 
@@ -32,7 +33,7 @@ def run_wrapper(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'featsfile', metavar='FEATURES_FILE', nargs=1,
+        'featsfile', metavar='FEATURES_FILE',
         help='features file in h5features format')
     parser.add_argument(
         'percentile', metavar='PERCENTILE', type=int,
