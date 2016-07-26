@@ -13,7 +13,7 @@ ctypedef struct FullMatch:
     float length
     float disto
 
-cdef extern from "dot.h":
+cdef extern from "../ZRTools/plebdisc/dot.h":
     ctypedef struct Match:
         int xA, xB, yA, yB
         float rhoampl
