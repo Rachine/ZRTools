@@ -12,15 +12,17 @@
 #include "second_pass.h"
 #define MAXMATCHES 100000
 #define MAXDOTS_MF 50000000
+#include "util.h"
 /* #include "second_pass" */
 
 
 struct signature * signature_from_feats_array(PyArrayObject* feats) {
+  int i;
   unsigned char * arr = (unsigned char *) PyArray_DATA(feats);
   int N = PyArray_DIM(feats, 0);
   struct signature * res;
   res = (struct signature *) MALLOC(N*sizeof(struct signature));
-  for (int i=0; i<N; i++) {
+  for (i=0; i<N; i++) {
     res[i].byte_ = arr + (i * feats->dimensions[1]);
     res[i].id = i;
     res[i].query = 0;
