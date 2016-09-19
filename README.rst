@@ -34,5 +34,5 @@ plebdisc_tools:
   - estimate "good" parameters
 - io: load binary files in numpy arrays + a few operations on those.
 - evaluate:
-  - final step (ned)
+  - final step (ned) WIP
   - matches (precision, minimal achievable ned)

@@ -33,6 +33,8 @@ cdef int MIN_LEN = 4
 
 @cython.boundscheck(False)
 def secondpass(np.ndarray[Match, ndim=1] matchlist, np.ndarray feats1, np.ndarray feats2, int R, float castthr, float trimthr, int strategy, int nbest=5, bool exact=False):
+    """Returns the best matches for each initial point.
+    """
     cdef np.ndarray[Match, ndim=2] new_matchlist = np.zeros((matchlist.shape[0], nbest**2,), dtype=[('xA', 'i4'), ('xB', 'i4'), ('yA', 'i4'), ('yB', 'i4'), ('rhoampl', 'f4'), ('score', 'f4')])
     cdef int n_matches = 0
     cdef float ALPHA = 0.5

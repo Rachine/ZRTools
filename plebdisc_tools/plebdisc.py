@@ -11,7 +11,6 @@ import itertools
 from corpus import get_speaker
 
 
-#binpath='/home/roland/LSCP/spkterm/ArenJensen'
 binpath='../ZRTools/plebdisc'
 
 class fdict(dict):
@@ -85,6 +84,16 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
                split=False):
     """Launch lsh for specified features, return a dictionnary containing for
     all files the path to their signature, features and vad.
+
+    Parameters:
+    ----------
+    features_file: h5features file name
+    featsdir: output folder where the features will be written
+    S: int, number of bits of the lsh signature
+    files: list, only launch lsh on the specified files.
+        (must be the basename of the file, like in the h5features file)
+    with_vad: optional VAD file
+    
     """
     def aux(f, feats, S, D, featfile, sigfile, vadfile=None, vad=None):
         with open(featfile, 'wb') as fout:
@@ -167,6 +176,8 @@ def check_call_stdout(command_stdout):
 
 
 def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, medthr=0.5, dx=25, dy=3, rhothr=0, castthr=0.5, R=10, onepass=False, rescoring=True, dump_matchlist=None, dump_sparsematrix=None, dump_filteredmatrix=None):
+    """Call plebdisc
+    """
     if not within:
         raise NotImplementedError
     tmpfiles = {}
@@ -275,16 +286,6 @@ def do_norm_hamming_sim(X1, X2, S):
     vectgmpy = np.vectorize(lambda x: bin(x).count('1'))
     similarities = np.bitwise_xor(X1, X2)
     return np.cos(vectgmpy(similarities).astype(float) / 64 * np.pi)
-
-
-# @nb.autojit
-# def do_norm_hamming_sim(X1, X2, S):
-#     n_feats = X1.shape[0]
-#     similarities = np.empty((n_feats,))
-#     for i in range(n_feats):
-#         similarities[i] = float(gmpy.popcount(np.bitwise_xor(X1[i], X2[i]))) / S
-#     similarities = np.bitwise_xor(X1, X2)
-#     return vectgmpy(similarities).astype(float) / 64
 
 
 def read_sigs_remove_sils(files):
@@ -442,16 +443,12 @@ if __name__ == '__main__':
     T, castthr = compute_percentile_param(
         [args['q'], args['qdtw']],
         features_file, within)
-    # with_vad = False
-    # if 'vad' in args:
-    #     with_vad = True
-    #     vad = read_vad(args['vad'])
     try:
         featsdir = tempfile.mkdtemp()
         with_vad=False
         if 'vad' in args:
             with_vad = args['vad']
-            # write_vad_files(vad, files, featsdir)
+            # write_vad_files(with_vad, files, featsdir)
         files = launch_lsh(
             features_file, featsdir, args['S'], with_vad=with_vad)
         launch_plebdisc(
