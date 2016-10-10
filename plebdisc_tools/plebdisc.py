@@ -1,4 +1,21 @@
+#/usr/bin/env python 
+
+'''
+plebdisc.py
+
+ENVIRONMENTAL VARIABLES
+=======================
+
+ZRPATH : Path to the directory with ZRTOOLS binary directory
+        to setset in bash:
+            
+            >> export ZRPATH={YOUR ZRPATH}
+
+'''
+
+
 from __future__ import print_function, division
+
 import numpy as np
 import argparse
 import subprocess
@@ -8,10 +25,14 @@ import tempfile
 import os
 import h5py
 import itertools
+
 from corpus import get_speaker
 
-
-binpath='../ZRTools/plebdisc'
+## environmental variable to the installation of ZRTools package
+try:
+    binpath = os.environ['ZRPATH']
+except:
+    binpath = '../ZRTools/plebdisc'
 
 class fdict(dict):
     def __init__(self, *args, **kwargs):
