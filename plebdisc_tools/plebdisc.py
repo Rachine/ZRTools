@@ -1,4 +1,4 @@
-#/usr/bin/env python 
+#!/usr/bin/env python 
 
 '''
 plebdisc.py
@@ -12,7 +12,6 @@ ZRPATH : Path to the directory with ZRTOOLS binary directory
             >> export ZRPATH={YOUR ZRPATH}
 
 '''
-
 
 from __future__ import print_function, division
 
@@ -28,77 +27,23 @@ import itertools
 
 from corpus import get_speaker
 
-## environmental variable to the installation of ZRTools package
+__all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
+        'launch_plebdisc', 'merge_results', 'do_cosine_similarity', 
+        'do_norm_hamming_sim', 'read_sigs_remove_sils', 'estimate_recall',
+        'compute_percentile_param', 'estimate_similarities_distribution',
+        'read_vad', 'write_vad_files' ] 
+
+## environmental variable thats is set to the installation of ZRTools binary package
 try:
     binpath = os.environ['ZRPATH']
 except:
     binpath = '../ZRTools/plebdisc'
 
+
 class fdict(dict):
     def __init__(self, *args, **kwargs):
         super(fdict, self).__init__(*args, **kwargs)
         self.stats = {}
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    g1 = parser.add_argument_group('General')
-    g1.add_argument('features_file',
-                    help='features file in the h5features format')
-    g1.add_argument('output_file',
-                    help='where the results will be stored')
-    g1.add_argument('-files', nargs='+', required=False,
-                    help='only compare this files')
-    g1.add_argument('-S', default=64, type=int,
-                    help='size of the signatures (in bits)')
-    g1.add_argument('-maxframes', default=None, type=int)
-    g1.add_argument('-within', default=False, action='store_true')
-    g1.add_argument('-vad', nargs=1, required=False,
-                    help='vad file')
-
-    g2 = parser.add_argument_group('Similarity matrix')
-    g2.add_argument('-P', default=4, type=int,
-                    help='number of permutations')
-    g2.add_argument('-B', default=100, type=int,
-                    help='width of the band')
-    g2.add_argument('-q', default=90, type=float,
-                    help='percentile threshold, frames above that percentile'
-                    'will be considered similars')
-    g2.add_argument('-D', default=10, type=int,
-                    help='length of diagonal search when point found')
-
-    g3 = parser.add_argument_group('Matches search')
-    g3.add_argument('-medthr', default=0.5, type=float,
-                    help='minimal proportion of matches in the smoothing'
-                    'window for the point to be considered a match')
-    g3.add_argument('-dx', default=25, type=int,
-                    help='size of the smoothing window along time axis '
-                    '(diagonal), and double of the minimal length of a match')
-    g3.add_argument('-dy', default=3, type=int,
-                    help='size of the gaussian window (anti-diagonal)')
-    g3.add_argument('-rhothr', default=0, type=int,
-                    help='threshold on the number of points in the diagonal'
-                    'for it to be investigated')
-    g3.add_argument('-matchlist', type=str, required=False,
-                    help='store the match list in that file')
-    g3.add_argument('-onepass', default=False, action='store_true',
-                    help='stop after computing matchlist (do not do S-DTW)')
-
-    g4 = parser.add_argument_group('S-DTW')
-    g4.add_argument('-R', default=10, type=int,
-                    help='dtw band width')
-    g4.add_argument('-qdtw', default=90, type=float,
-                    help='percentile threshold, frames above that percentile'
-                    'will be considered similars')
-    g4.add_argument('-alpha', default=0.5, type=float,
-                    help='exponential smoothing parameter')
-
-    parser.add_argument('-Tscore', default=0.75, type=float,
-                        help='TODO')
-    args = parser.parse_args()
-    assert args['q'] >= 0 and args['q'] <= 100, "'q' must be a percentile" 
-    assert args['qdtw'] >= 0 and args['qdtw'] <= 100, "'qdtw' must be a percentile" 
-    return args
 
 
 def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
@@ -454,28 +399,98 @@ def tryremove(f):
         pass
 
 
-if __name__ == '__main__':
-    args = parse_args()
-    features_file = args['features_file']
-    files = None
-    if 'files' in args:
-        files = args['files']
-    within = args['within']
-    T, castthr = compute_percentile_param(
-        [args['q'], args['qdtw']],
-        features_file, within)
+def _restricted_float(x):
+    '''_restricted_float(x) 
+     
+    Parameters
+    ----------
+    x: float
+
+    Check if a values is between 0. -> 100.0 raise argparse.ArgumentTypeError if out of limits
+    '''
+    x = float(x)
+    if x < 0.0 or x > 100.0:
+        raise argparse.ArgumentTypeError("%r not in range [0.0, 100.0]"%(x,))
+    
+    return x
+
+
+def main():
+    ''' Example:
+    >> python plebdisc.py -q 80 -files 's0101a_0' 's0101a_4' -S 32 -D 39 mfcc_split.old output
+    '''
+    parser = argparse.ArgumentParser(description='Run plebdisc ')
+
+    # ...General...
+    parser.add_argument('features_file', help='features file in the h5f')
+    parser.add_argument('output', help='where the results will be stored')
+    parser.add_argument('-files', nargs='+', required=False, help='only compare this files')
+    parser.add_argument('-S', default=64, type=int, help='size of the signatures (in bits)')
+    parser.add_argument('-maxframes', default=None, type=int)
+    parser.add_argument('-within', default='within')
+    parser.add_argument('-vad', nargs=1, required=False, help='vad file')
+
+    # ...Similarity matrix...
+    parser.add_argument('-P', default=4, type=int, help='number of permutations')
+    parser.add_argument('-B', default=100, type=int, help='width of the band')
+    parser.add_argument('-q', default=90, type=_restricted_float, 
+            help=('percentile threshold, frames above that percentile ',
+                  'will be considered similars'))
+    parser.add_argument('-D', default=10, type=int, 
+            help=('length of diagonal search when point found'))
+
+    # ... Matches search ...
+    parser.add_argument('-medthr', default=0.5, type=float, 
+            help=('minimal proportion of matches in the smoothing',
+                  'window for the point to be considered a match'))
+    parser.add_argument('-dx', default=25, type=int, 
+            help=('size of the smoothing window along ',
+			      'time axis (diagonal), and double of the',
+			      ' minimal length of a match'))
+    parser.add_argument('-dy', default=3, type=int, 
+            help='size of the gaussian window (anti-diagonal)')
+    parser.add_argument('-rhothr', default=0, type=int, 
+            help=('threshold on the number of points in the diagonal',
+                  'for it to be investigated'))
+    parser.add_argument('-matchlist', type=str, required=False, 
+            help='store the match list in that file')
+    parser.add_argument('-onepass', default=False, action='store_true', 
+            help=('stop after computing matchlist (do not do S-DTW)'))
+
+    # ...S-DTW...
+    parser.add_argument('-R', default=10, type=int, help='dtw band width')
+    parser.add_argument('-qdtw', default=90, type=_restricted_float, 
+            help=('percentile threshold, frames above that percentile',
+                  ' will be considered similars'))
+    parser.add_argument('-alpha', default=0.5, type=float, 
+            help='exponential smoothing parameter')
+    parser.add_argument('-Tscore', default=0.75, type=float, help='TODO')
+    
+    args = parser.parse_args() # TODO: gives a TypeError if using -h  
+
+    features_file = args.features_file
+    
+    T, castthr = compute_percentile_param(percentile=(args.q, args.qdtw), 
+            features_file=features_file, comparison=args.within)
+
     try:
-        featsdir = tempfile.mkdtemp()
-        with_vad=False
-        if 'vad' in args:
-            with_vad = args['vad']
+        featsdir = tempfile.mkdtemp(prefix='pldisc_')
+        with_vad = False
+        if args.vad != None:
+            with_vad = args.vad[0]
             # write_vad_files(with_vad, files, featsdir)
-        files = launch_lsh(
-            features_file, featsdir, args['S'], with_vad=with_vad)
-        launch_plebdisc(
-            files, args['output'], within, args['P'], args['B'],
-            T, args['D'], args['S'], args['medthr'], args['dx'],
-            args['dy'], args['rhothr'], args['castthr'],
-            args['R'], args['onepass'])
+
+        files = launch_lsh(features_file, featsdir, S=args.S, files=args.files, 
+                           with_vad=with_vad, split=False)
+        launch_plebdisc(files, args.output, args.within, args.P, args.B, T, args.D, 
+			            args.S, args.medthr, args.dx, args.dy, args.rhothr, castthr,
+            		    args.R, args.onepass)
+
     finally:
         tryremove(featsdir)
+
+
+if __name__ == '__main__':
+    main()
+
+
