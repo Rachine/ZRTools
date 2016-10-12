@@ -3,6 +3,10 @@
 '''
 plebdisc.py
 
+DESCRIPTION
+===========
+
+
 ENVIRONMENTAL VARIABLES
 =======================
 
@@ -15,6 +19,8 @@ ZRPATH : Path to the directory with ZRTOOLS binary directory
 
 from __future__ import print_function, division
 
+from subprocess import Popen, PIPE
+import multiprocessing
 import numpy as np
 import argparse
 import subprocess
@@ -24,8 +30,10 @@ import tempfile
 import os
 import h5py
 import itertools
+import re
 
 from corpus import get_speaker
+
 
 __all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
         'launch_plebdisc', 'merge_results', 'do_cosine_similarity', 
@@ -33,12 +41,19 @@ __all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
         'compute_percentile_param', 'estimate_similarities_distribution',
         'read_vad', 'write_vad_files' ] 
 
-## environmental variable thats is set to the installation of ZRTools binary package
+
+# regexs to decode the stdout from plebdisc
+_reg_plebdisc = re.compile(r"    Dumping (\d+) matches\n((.*\n)+)", re.MULTILINE)  
+
+
+# environmental variable thats is set to the installation of ZRTools binary package
 try:
     binpath = os.environ['ZRPATH']
 except:
     binpath = '../ZRTools/plebdisc'
 
+assert os.path.isdir(binpath), 'ZRPATH not set or {} doesn\'t exit'.format(binpath) 
+ 
 
 class fdict(dict):
     def __init__(self, *args, **kwargs):
@@ -64,13 +79,19 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     def aux(f, feats, S, D, featfile, sigfile, vadfile=None, vad=None):
         with open(featfile, 'wb') as fout:
             fout.write(feats.tobytes())
-        command = '{}/lsh -S {} -D {} -projfile proj_b{}xd{}_seed1 -featfile {} -sigfile {}'.format(binpath, S, D, S, D, featfile, sigfile)
+        
+        command_ = '{}/lsh -S {} -D {} -projfile proj_b{}xd{}_seed1 -featfile {} -sigfile {}'
+        command_ = command_.format(binpath, S, D, S, D, featfile, sigfile)
         if vadfile:
             with open(vadfile, 'w') as fout:
                 for interval in vad[f]:
                     fout.write(' '.join(map(str, interval)) + '\n')
-            command += ' -vadfile {}'.format(vadfile)
-        subprocess.check_output([command], shell=True)
+            command_ += ' -vadfile {}'.format(vadfile)
+        p_ = Popen(command_, shell=True, stdout=PIPE, stderr=PIPE)
+        output_, err_ = p_.communicate() 
+        if 'usage' in err_:
+            print(err_)
+            raise NameError('Cannot run command: {}'.format(command_))
 
     vad = {}
     if with_vad:
@@ -82,11 +103,18 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
                     vad[fname].append((start, end))
                 except KeyError:
                     vad[fname] = [(start, end)]
+    
+    # generate a file with DxS normal random values [=numpy.random.norm(0.0,1.0,D*S)] 
     D = h5py.File(features_file)['features']['features'].shape[1]
-    subprocess.check_output(['{}/genproj -D {} -S {} -seed 1'.format(binpath, D, S)], shell=True)
+    command_ = '{}/genproj -D {} -S {} -seed 1'.format(binpath, D, S)
+    p_ = Popen(command_, shell=True, stdout=PIPE, stderr=PIPE)
+    output_, err_ = p_.communicate()
+    if 'unknown' in err_:
+        print(err_)
+        raise NameError('Cannot run command: {}'.format(command_))
+
     res = fdict()
-    res.stats['S'] = S
-    res.stats['D'] = D
+    res.stats = {'S':S, 'D':D} 
     if not os.path.exists(featsdir):
         os.makedirs(featsdir)
     if files == None:
@@ -126,7 +154,6 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     return res
 
 
-import multiprocessing
 def launch_job(commands, stdout, n_cpu):
     if n_cpu > 1:
         pool = multiprocessing.Pool(n_cpu)
@@ -146,6 +173,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
     """
     if not within:
         raise NotImplementedError
+    
     tmpfiles = {}
     tmpfiles_rescore = {}
     if dump_matchlist:
@@ -153,6 +181,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
             os.makedirs(dump_matchlist)
         except OSError:
             pass
+
     try:
         for spk in files:
             n = len(files[spk]) ** 2
@@ -161,37 +190,72 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 if percent != i * 100 // n:
                     percent = i * 100 // n
                     print('{}'.format(percent))
+                
                 sigfile1, sigfile2 = files[spk][f1]['sig'], files[spk][f2]['sig']
-                fout, tmpfile = tempfile.mkstemp()
-                fout_rescore, tmpfile_rescore = tempfile.mkstemp()
+                fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_')
+                fout_rescore, tmpfile_rescore = tempfile.mkstemp(prefix='pldisc_')
                 f1_f2 = '{} {}'.format(f1, f2)
-                tmpfiles[f1_f2] = tmpfile
+                tmpfiles[f1_f2] = matching_fname
                 tmpfiles_rescore[f1_f2] = tmpfile_rescore
-                command = '{}/plebdisc -S {} -P {} -T {} -B {} -dtwscore 1 -dx {} -dy {} -medthr {} -twopass {} -R {} -castthr {} -trimthr {} -rhothr {} -file1 {} -file2 {}'.format(binpath, S, P, T, B, dx, dy, medthr, int(not onepass), R, castthr, castthr, rhothr, sigfile1, sigfile2)
+                
+                command_ = '{}/plebdisc -D {} -S {} -P {} -T {} -B {} -dtwscore 1 ' + \
+                          '-dx {} -dy {} -medthr {} -twopass {} -R {} -castthr {} ' + \
+                          ' -trimthr {} -rhothr {} -file1 {} -file2 {}' 
+                command_ = command_.format(binpath, D, S, P, T, B,
+                        dx, dy, medthr, int(not onepass), R, castthr,
+                        castthr, rhothr, sigfile1, sigfile2) # TODO: castthr replace trimthr?
                 if dump_matchlist:
-                    command += ' -dump-matchlist {}/"{}"'.format(dump_matchlist, f1_f2)
+                    command_ += ' -dump-matchlist {}/"{}"'.format(dump_matchlist, f1_f2)
                 if dump_sparsematrix:
                     assert len(dump_sparsematrix) == 2
-                    command += ' -dump-sparsematrix {} {}'.format(*dump_sparsematrix)
+                    command_ += ' -dump-sparsematrix {} {}'.format(*dump_sparsematrix)
                 if dump_filteredmatrix:
                     assert len(dump_filteredmatrix) == 2
-                    command += ' -dump-filteredmatrix {} {}'.format(*dump_filteredmatrix)
+                    command_ += ' -dump-filteredmatrix {} {}'.format(*dump_filteredmatrix)
+                
+                p_ = Popen(command_, shell=True, stdout=PIPE, stderr=PIPE)   
+                output_, err_ = p_.communicate()                                         
+                if 'usage' in err_ or 'Error' in err_:
+                    print(err_)
+                    raise NameError('Cannot run command: {}'.format(command_))           
 
-                subprocess.check_call([command], shell=True, stdout=fout)
+                # matching_fname will contain the decodec output of plebdisc (only the mathes) 
+                # information that is an input of restcore_dtw
+                res_ = _reg_plebdisc.findall(output_)
+                if not res_:
+                    raise NameError('not results from plebdisc')
+                res_ = list(res_[0])
+                n_matches, matches = int(res_[0]), ''.join(res_[1]) # TODO: can it contain more 2 el
+                matches = re.sub('\\n+','\\n', matches) # double CR produce errors in rescore_dtw
+                assert n_matches == matches.count('\n'), 'could\'t decode plebdisc stdout'
+                os.write(fout, matches)
+
                 if rescoring:
                     feafile1, feafile2 = files[spk][f1]['fea'], files[spk][f2]['fea']
-                    command = '{}/rescore_singlepair_dtw -D {} -file1 {} -file2 {} -matchlist {}'.format(binpath, files.stats['D'], feafile1, feafile2, tmpfile)
-                    subprocess.check_call([command], shell=True, stdout=fout_rescore)
+                    command_ = '{}/rescore_dtw -D {} -file1 {} -file2 {} -matchlist {}'
+                    command_ = command_.format(binpath, files.stats['D'], feafile1, feafile2, 
+                            matching_fname)
+                    p_ = Popen(command_, shell=True, stdout=fout_rescore, stderr=PIPE)
+                    output_, err_ = p_.communicate()
+                    if 'usage' in err_ or 'Error' in err_: 
+                        print(err_)  
+                        raise NameError('Cannot run command: {}'.format(command_))    
+                    #subprocess.check_call([command], shell=True, stdout=fout_rescore)
+
                 os.close(fout)
                 os.close(fout_rescore)
+
         if rescoring:
             merge_results(tmpfiles_rescore, output)
         else:
             merge_results(tmpfiles, output)
+
     finally:
         for f in tmpfiles.itervalues():
+            pass
             tryremove(f)
         for f in tmpfiles_rescore.itervalues():
+            pass
             tryremove(f)
 
 
