@@ -20,16 +20,18 @@ ZRPATH : Path to the directory with ZRTOOLS binary directory
 from __future__ import print_function, division
 
 from subprocess import Popen, PIPE
+from itertools import izip, product
+from collections import defaultdict
+
 import multiprocessing
 import numpy as np
+import numba as nb
 import argparse
 import subprocess
 import h5features
-import numba as nb
 import tempfile
 import os
 import h5py
-import itertools
 import re
 
 from corpus import get_speaker
@@ -95,15 +97,14 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
 
     vad = {}
     if with_vad:
+        vad_ = defaultdict(list)
         with open(with_vad) as fin:
             for line in fin:
                 fname, start, end = line.strip().split()
                 start, end = map(lambda t: int(float(t) * 100), (start, end))
-                try:
-                    vad[fname].append((start, end))
-                except KeyError:
-                    vad[fname] = [(start, end)]
-    
+                vad_[fname].append((start, end))
+        vad = dict(vad_)
+
     # generate a file with DxS normal random values [=numpy.random.norm(0.0,1.0,D*S)] 
     D = h5py.File(features_file)['features']['features'].shape[1]
     command_ = '{}/genproj -D {} -S {} -seed 1'.format(binpath, D, S)
@@ -117,23 +118,29 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     res.stats = {'S':S, 'D':D} 
     if not os.path.exists(featsdir):
         os.makedirs(featsdir)
+
     if files == None:
         files = h5features.read(features_file)[0].keys()
+    
     for f in files:
         spk = get_speaker(f)
+
         if not split:
             sigfile = os.path.join(featsdir, f + ".sig")
             vadfile = os.path.join(featsdir, f + ".vad")
             featfile = os.path.join(featsdir, f + ".fea")
             feats = h5features.read(features_file, from_item=f)[1][f]
+            
             if with_vad:
                 aux(f, feats, S, D, featfile, sigfile, vadfile, vad)
             else:
                 aux(f, feats, S, D, featfile, sigfile)
+            
             try :
                 res[spk][f] =  {'sig': sigfile, 'fea': featfile}
             except KeyError:
                 res[spk] = {f: {'sig': sigfile, 'fea': featfile}}
+            
             if with_vad:
                 res[spk][f]['vad'] = vadfile
         else:
@@ -186,7 +193,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
         for spk in files:
             n = len(files[spk]) ** 2
             percent = -1
-            for i, (f1, f2) in enumerate(itertools.product(files[spk], files[spk])):
+            for i, (f1, f2) in enumerate(product(files[spk], files[spk])):
                 if percent != i * 100 // n:
                     percent = i * 100 // n
                     print('{}'.format(percent))
