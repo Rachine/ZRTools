@@ -47,7 +47,6 @@ __all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
 # regexs to decode the stdout from plebdisc
 _reg_plebdisc = re.compile(r"    Dumping (\d+) matches\n((.*\n)+)", re.MULTILINE)  
 
-
 # environmental variable thats is set to the installation of ZRTools binary package
 try:
     binpath = os.environ['ZRPATH']
@@ -56,6 +55,8 @@ except:
 
 assert os.path.isdir(binpath), 'ZRPATH not set or {} doesn\'t exit'.format(binpath) 
  
+
+VALID_BITS = [32, 64]
 
 class fdict(dict):
     def __init__(self, *args, **kwargs):
@@ -78,6 +79,10 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     with_vad: optional VAD file
     
     """
+   
+    if S not in VALID_BITS:
+        raise ValueError('S={} must be 32 or 64'.format(S))
+
     def aux(f, feats, S, D, featfile, sigfile, vadfile=None, vad=None):
         with open(featfile, 'wb') as fout:
             fout.write(feats.tobytes())
@@ -123,6 +128,7 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         files = h5features.read(features_file)[0].keys()
     
     for f in files:
+
         spk = get_speaker(f)
 
         if not split:
@@ -178,6 +184,10 @@ def check_call_stdout(command_stdout):
 def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, medthr=0.5, dx=25, dy=3, rhothr=0, castthr=0.5, R=10, onepass=False, rescoring=True, dump_matchlist=None, dump_sparsematrix=None, dump_filteredmatrix=None):
     """Call plebdisc
     """
+
+    if S not in VALID_BITS:                                    
+        raise ValueError('S={} must be 32 or 64'.format(S))    
+
     if not within:
         raise NotImplementedError
     
@@ -192,11 +202,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
     try:
         for spk in files:
             n = len(files[spk]) ** 2
-            percent = -1
-            for i, (f1, f2) in enumerate(product(files[spk], files[spk])):
-                if percent != i * 100 // n:
-                    percent = i * 100 // n
-                    print('{}'.format(percent))
+            for f1, f2 in product(files[spk], files[spk]):
                 
                 sigfile1, sigfile2 = files[spk][f1]['sig'], files[spk][f2]['sig']
                 fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_')
@@ -490,7 +496,10 @@ def main():
     ''' Example:
     >> python plebdisc.py -q 80 -files 's0101a_0' 's0101a_4' -S 32 -D 39 mfcc_split.old output
     '''
+
     parser = argparse.ArgumentParser(description='Run plebdisc ')
+    parser.add_argument("--verbose", help="increase output verbosity",
+                         action="store_true")
 
     # ...General...
     parser.add_argument('features_file', help='features file in the h5f')
@@ -553,6 +562,7 @@ def main():
 
         files = launch_lsh(features_file, featsdir, S=args.S, files=args.files, 
                            with_vad=with_vad, split=False)
+        
         launch_plebdisc(files, args.output, args.within, args.P, args.B, T, args.D, 
 			            args.S, args.medthr, args.dx, args.dy, args.rhothr, castthr,
             		    args.R, args.onepass)
