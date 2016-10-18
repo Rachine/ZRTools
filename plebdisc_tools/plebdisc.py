@@ -79,7 +79,10 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     with_vad: optional VAD file
     
     """
-   
+
+    if not os.path.isfile(features_file):
+        raise ValueError('file {} doesn\'t exist'.format(features_file))
+
     if S not in VALID_BITS:
         raise ValueError('S={} must be 32 or 64'.format(S))
 
@@ -236,12 +239,15 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 # information that is an input of restcore_dtw
                 res_ = _reg_plebdisc.findall(output_)
                 if not res_:
-                    raise NameError('not results from plebdisc')
-                res_ = list(res_[0])
-                n_matches, matches = int(res_[0]), ''.join(res_[1]) # TODO: can it contain more 2 el
-                matches = re.sub('\\n+','\\n', matches) # double CR produce errors in rescore_dtw
-                assert n_matches == matches.count('\n'), 'could\'t decode plebdisc stdout'
-                os.write(fout, matches)
+                    t_ = 'not scoring results from plebdisc, no recoring_dtw'
+                    Warning(t_)
+                    os.write(fout, t_) # if rescoring the result will be null
+                else:
+                    res_ = list(res_[0])
+                    n_matches, matches = int(res_[0]), ''.join(res_[1]) # TODO: can it contain more 2 el
+                    matches = re.sub('\\n+','\\n', matches) # double CR produce errors in rescore_dtw
+                    assert n_matches == matches.count('\n'), 'could\'t decode plebdisc stdout'
+                    os.write(fout, matches) # write on matching_fname file
 
                 if rescoring:
                     feafile1, feafile2 = files[spk][f1]['fea'], files[spk][f2]['fea']
