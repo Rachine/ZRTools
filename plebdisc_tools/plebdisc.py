@@ -23,6 +23,7 @@ from subprocess import Popen, PIPE
 from itertools import izip, product
 from collections import defaultdict
 
+import warnings
 import multiprocessing
 import numpy as np
 import numba as nb
@@ -90,6 +91,7 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         with open(featfile, 'wb') as fout:
             fout.write(feats.tobytes())
         
+        # lsh creates .sig file 
         command_ = '{}/lsh -S {} -D {} -projfile proj_b{}xd{}_seed1 -featfile {} -sigfile {}'
         command_ = command_.format(binpath, S, D, S, D, featfile, sigfile)
         if vadfile:
@@ -102,6 +104,8 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         if 'usage' in err_:
             print(err_)
             raise NameError('Cannot run command: {}'.format(command_))
+        if os.stat(sigfile).st_size == 0: # warn lsh without results
+            warnings.warn('no results from lsh ({} empty)'.format(sigfile))
 
     vad = {}
     if with_vad:
@@ -114,13 +118,18 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         vad = dict(vad_)
 
     # generate a file with DxS normal random values [=numpy.random.norm(0.0,1.0,D*S)] 
+    # TODO: can be different the output file from genproj? 
     D = h5py.File(features_file)['features']['features'].shape[1]
-    command_ = '{}/genproj -D {} -S {} -seed 1'.format(binpath, D, S)
+    proj_f_ = 'proj_b{}xd{}_seed1'.format(S, D)
+    command_ = '{}/genproj -S {} -D {} -seed 1'.format(binpath, S, D)
     p_ = Popen(command_, shell=True, stdout=PIPE, stderr=PIPE)
     output_, err_ = p_.communicate()
     if 'unknown' in err_:
         print(err_)
         raise NameError('Cannot run command: {}'.format(command_))
+    
+    if os.stat(proj_f_).st_size == 0: 
+        warnings.warn('genproj didn\'t create file {} or empty'.format(proj_f_))
 
     res = fdict()
     res.stats = {'S':S, 'D':D} 
@@ -131,9 +140,7 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
         files = h5features.read(features_file)[0].keys()
     
     for f in files:
-
         spk = get_speaker(f)
-
         if not split:
             sigfile = os.path.join(featsdir, f + ".sig")
             vadfile = os.path.join(featsdir, f + ".vad")
@@ -206,7 +213,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
         for spk in files:
             n = len(files[spk]) ** 2
             for f1, f2 in product(files[spk], files[spk]):
-                
+                print('{} {}'.format(f1, f2))    
                 sigfile1, sigfile2 = files[spk][f1]['sig'], files[spk][f2]['sig']
                 fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_')
                 fout_rescore, tmpfile_rescore = tempfile.mkstemp(prefix='pldisc_')
@@ -220,6 +227,8 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 command_ = command_.format(binpath, D, S, P, T, B,
                         dx, dy, medthr, int(not onepass), R, castthr,
                         castthr, rhothr, sigfile1, sigfile2) # TODO: castthr replace trimthr?
+                
+                # outputs from plebdisc are binary files
                 if dump_matchlist:
                     command_ += ' -dump-matchlist {}/"{}"'.format(dump_matchlist, f1_f2)
                 if dump_sparsematrix:
@@ -228,7 +237,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 if dump_filteredmatrix:
                     assert len(dump_filteredmatrix) == 2
                     command_ += ' -dump-filteredmatrix {} {}'.format(*dump_filteredmatrix)
-                
+               
                 p_ = Popen(command_, shell=True, stdout=PIPE, stderr=PIPE)   
                 output_, err_ = p_.communicate()                                         
                 if 'usage' in err_ or 'Error' in err_:
@@ -240,7 +249,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                 res_ = _reg_plebdisc.findall(output_)
                 if not res_:
                     t_ = 'not scoring results from plebdisc, no recoring_dtw'
-                    Warning(t_)
+                    warnings.warn(t_)
                     os.write(fout, t_) # if rescoring the result will be null
                 else:
                     res_ = list(res_[0])
@@ -268,6 +277,9 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
             merge_results(tmpfiles_rescore, output)
         else:
             merge_results(tmpfiles, output)
+
+        if os.stat(output).st_size == 0:
+            warnings.warn('No results from launch_plebdisc, {} is empty'.format(output))  
 
     finally:
         for f in tmpfiles.itervalues():
