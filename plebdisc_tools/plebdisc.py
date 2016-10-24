@@ -35,7 +35,7 @@ import os
 import h5py
 import re
 
-from corpus import get_speaker
+#from corpus import get_speaker
 
 
 __all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
@@ -134,7 +134,10 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     res = fdict()
     res.stats = {'S':S, 'D':D} 
     if not os.path.exists(featsdir):
-        os.makedirs(featsdir)
+        try:
+            os.makedirs(featsdir)
+        except:
+            pass
 
     if files == None:
         files = h5features.read(features_file)[0].keys()
@@ -177,6 +180,11 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     return res
 
 
+def get_speaker(fname):
+    ''' 
+    '''
+    return fname[:3] 
+
 def launch_job(commands, stdout, n_cpu):
     if n_cpu > 1:
         pool = multiprocessing.Pool(n_cpu)
@@ -213,7 +221,7 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
         for spk in files:
             n = len(files[spk]) ** 2
             for f1, f2 in product(files[spk], files[spk]):
-                print('{} {}'.format(f1, f2))    
+                #print('{} {}'.format(f1, f2))    
                 sigfile1, sigfile2 = files[spk][f1]['sig'], files[spk][f2]['sig']
                 fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_')
                 fout_rescore, tmpfile_rescore = tempfile.mkstemp(prefix='pldisc_')
@@ -270,8 +278,12 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                         raise NameError('Cannot run command: {}'.format(command_))    
                     #subprocess.check_call([command], shell=True, stdout=fout_rescore)
 
+                ##if files are not close and removed here it will keep a large number of files open
+                ##in the temporal directory and eventually crash the system
                 os.close(fout)
+                os.remove(matching_fname)
                 os.close(fout_rescore)
+                os.remove(tmpfile_rescore) 
 
         if rescoring:
             merge_results(tmpfiles_rescore, output)
@@ -283,10 +295,8 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
 
     finally:
         for f in tmpfiles.itervalues():
-            pass
             tryremove(f)
         for f in tmpfiles_rescore.itervalues():
-            pass
             tryremove(f)
 
 
