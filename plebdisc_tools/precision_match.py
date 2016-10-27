@@ -243,10 +243,11 @@ def levenstein_distance(l1, l2):
     l2_arr = np.fromiter((symbol2ix[s] for s in l2), dtype=np.uint32)
     return nb_levestein_distance(l1_arr, l2_arr)[len(l1_arr), len(l2_arr)]
 
-@nb.jit(nb.f4(nb.u4[:], nb.u4[:]))
+@nb.vectorize([nb.float64(nb.float64, nb.float64)])
 def nb_levestein_distance(l1, l2):
     n = len(l1)
     m = len(l2)
+    print('{} {}'.format(n,m))
     d = np.empty((n+1, m+1), dtype=np.int32)
     d[:, 0] = np.arange(n+1)
     d[0, :] = np.arange(m+1)
@@ -260,7 +261,7 @@ def nb_levestein_distance(l1, l2):
                               d[i-1, j-1] + 1)
     return d
 
-@nb.jit(nb.f4(nb.u4[:], nb.u4[:]))
+@nb.vectorize([nb.float64(nb.float64, nb.float64)])
 def nb_min_levestein_distance(l1, l2):
     n = len(l1)
     m = len(l2)
