@@ -11,9 +11,16 @@ ENVIRONMENTAL VARIABLES
 =======================
 
 ZRPATH : Path to the directory with ZRTOOLS binary directory
-        to setset in bash:
+         to setset in bash:
             
-            >> export ZRPATH={YOUR ZRPATH}
+            >> export ZRPATH=<your ZRPATH>
+
+TMPPATH: Path to the directory where the functions will keep temporary files
+         files stored on the directory will be removed after the fucntion is finished, 
+         however if in case of program crash, it must be removed by hand. To set the 
+         varible in bash:
+
+            >> export TMPPATH=<your TMPPATH>
 
 '''
 
@@ -56,6 +63,11 @@ except:
 
 assert os.path.isdir(binpath), 'ZRPATH not set or {} doesn\'t exit'.format(binpath) 
  
+try:
+    tmpdir = os.environ['TMPPATH']
+except:
+    tmpdir = tempfile.gettempdir()
+
 
 VALID_BITS = [32, 64]
 
@@ -221,10 +233,9 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
         for spk in files:
             n = len(files[spk]) ** 2
             for f1, f2 in product(files[spk], files[spk]):
-                #print('{} {}'.format(f1, f2))    
                 sigfile1, sigfile2 = files[spk][f1]['sig'], files[spk][f2]['sig']
-                fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_')
-                fout_rescore, tmpfile_rescore = tempfile.mkstemp(prefix='pldisc_')
+                fout, matching_fname = tempfile.mkstemp(prefix='pldisc_match_', dir=tmpdir)
+                fout_rescore, tmpfile_rescore = tempfile.mkstemp(prefix='pldisc_', dir=tmpdir)
                 f1_f2 = '{} {}'.format(f1, f2)
                 tmpfiles[f1_f2] = matching_fname
                 tmpfiles_rescore[f1_f2] = tmpfile_rescore
@@ -278,17 +289,31 @@ def launch_plebdisc(files, output, within=True, P=4, B=100, T=0.5, D=10, S=64, m
                         raise NameError('Cannot run command: {}'.format(command_))    
                     #subprocess.check_call([command], shell=True, stdout=fout_rescore)
 
-                ##if files are not close and removed here it will keep a large number of files open
-                ##in the temporal directory and eventually crash the system
-                os.close(fout)
-                os.remove(matching_fname)
-                os.close(fout_rescore)
-                os.remove(tmpfile_rescore) 
+                else: 
+                    ##if files are not close and removed here it will keep a large number of files open
+                    ##in the temporal directory and eventually crash the system
+                    try:
+                        os.close(fout)
+                        os.close(fout_rescore)
+                        os.remove(matching_fname)
+                        os.remove(tmpfile_rescore) 
+                    except IOError:
+                        pass
+                try:
+                    os.close(fout) 
+                    os.close(fout_rescore)
+                except:
+                    pass
 
         if rescoring:
             merge_results(tmpfiles_rescore, output)
+            os.remove(matching_fname) 
+            os.remove(tmpfile_rescore)
+
         else:
             merge_results(tmpfiles, output)
+            os.remove(matching_fname) 
+            os.remove(tmpfile_rescore)
 
         if os.stat(output).st_size == 0:
             warnings.warn('No results from launch_plebdisc, {} is empty'.format(output))  
