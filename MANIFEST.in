@@ -1,0 +1,8 @@
+include README.rst
+include plebdisc_tools/build_index
+include plebdisc_tools/genproj
+include plebdisc_tools/lsh
+include plebdisc_tools/plebdisc
+include plebdisc_tools/plebkws
+include plebdisc_tools/rescore_singlepair_dtw
+include plebdisc_tools/standfeat

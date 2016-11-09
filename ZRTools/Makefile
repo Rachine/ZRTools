@@ -8,3 +8,8 @@ clean:
 	make -C plebdisc clean
 	make -C srailsdisc clean
 
+install:
+	make -c plebdisc install
+
+.PHONY: install
+

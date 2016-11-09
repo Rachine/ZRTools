@@ -4,6 +4,9 @@ OPT = -O4 -std=c99 -Wall
 #OPT = -O4 -pg -std=c99 -Wall
 #OPT = -O4 -g -std=c99 -Wall
 
+install: plebdisc plebkws build_index genproj lsh standfeat rescore_singlepair_dtw
+	install -m 0755 $^ $(DESTDIR)
+
 util.o: util.c util.h Makefile 
 	gcc ${OPT} -c util.c 
 
