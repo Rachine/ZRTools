@@ -17,7 +17,7 @@ srails_disc: srails_disc.c dot.o feat.o util.o Makefile signature.c
 	gcc ${OPT} -o srails_disc srails_disc.c signature.c -lm util.o dot.o feat.o 
 
 genproj: Makefile genproj.c util.o
-	gcc ${OPT}  -o genproj genproj.c -lm util.o 
+	gcc ${OPT}  -o genproj genproj.c util.o -lm 
 
 lsh: Makefile lsh.c util.o
 	gcc ${OPT}  -o lsh lsh.c util.o -lm 
