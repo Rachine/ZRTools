@@ -1,6 +1,16 @@
+.gitignore
+
+# Compiled modules
 *.pyc
 *.so
 *.o
-*~
 
+# Setuptools distribution folder
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools
+/*.egg-info
+
+# other files
+*~
 *.wav
