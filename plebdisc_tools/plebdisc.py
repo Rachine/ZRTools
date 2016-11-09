@@ -15,6 +15,8 @@ ZRPATH : Path to the directory with ZRTOOLS binary directory
             
             >> export ZRPATH=<your ZRPATH>
 
+         if not set, it will be the installation directory
+
 TMPPATH: Path to the directory where the functions will keep temporary files
          files stored on the directory will be removed after the fucntion is finished, 
          however if in case of program crash, it must be removed by hand. To set the 
@@ -42,15 +44,17 @@ import os
 import h5py
 import re
 
-#from corpus import get_speaker
 
-
-__all__ = ['launch_lsh', 'launch_job', 'check_call_stdout', 'get_speaker',
+__all__ = ['launch_lsh', 'launch_job',
         'launch_plebdisc', 'merge_results', 'do_cosine_similarity', 
         'do_norm_hamming_sim', 'read_sigs_remove_sils', 'estimate_recall',
-        'compute_percentile_param', 'estimate_similarities_distribution',
-        'read_vad', 'write_vad_files' ] 
+        'compute_percentile_param', 'estimate_similarities_distribution' ] 
 
+#from corpus import get_speaker
+def get_speaker(fname):
+    ''' 
+    '''
+    return fname[:3] 
 
 # regexs to decode the stdout from plebdisc
 _reg_plebdisc = re.compile(r"    Dumping (\d+) matches\n((.*\n)+)", re.MULTILINE)  
@@ -59,7 +63,7 @@ _reg_plebdisc = re.compile(r"    Dumping (\d+) matches\n((.*\n)+)", re.MULTILINE
 try:
     binpath = os.environ['ZRPATH']
 except:
-    binpath = '../ZRTools/plebdisc'
+    binpath = os.path.dirname(__file__)
 
 assert os.path.isdir(binpath), 'ZRPATH not set or {} doesn\'t exit'.format(binpath) 
  
@@ -192,10 +196,6 @@ def launch_lsh(features_file, featsdir, S=64, files=None, with_vad=None,
     return res
 
 
-def get_speaker(fname):
-    ''' 
-    '''
-    return fname[:3] 
 
 def launch_job(commands, stdout, n_cpu):
     if n_cpu > 1:
