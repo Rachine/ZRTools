@@ -24,6 +24,11 @@ from recordtype import recordtype
 import datastructures as ds
 import numba as nb
 
+__all__ = [ 'launch_lsh', 'launch_job', 'launch_plebdisc',
+            'merge_results', 'do_cosine_similarity', 
+            'do_norm_hamming_sim', 'read_sigs_remove_sils', 
+            'estimate_recall', 'compute_percentile_param',
+            'estimate_similarities_distribution' ]
 
 # RESOLUTION PARAMETERS:
 FRATE = 100  # number of frames per seconds
