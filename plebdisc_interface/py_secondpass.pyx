@@ -374,6 +374,116 @@ cdef np.ndarray[int, ndim=2] sig_find_paths(np.ndarray feats1, np.ndarray feats2
     return elts_idx[sorted_idx[n_elt-nbest:]]
 
 
+@cython.boundscheck(False)
+@cython.cdivision(True)
+cdef np.ndarray[int, ndim=2] sig_find_paths_exact(np.ndarray[float, ndim=2] feats1, np.ndarray[float, ndim=2] feats2, int direction, int xM, int yM, float castthr, float trimthr, int R, int strategy, float alpha, int nbest, bool with_dist):
+
+    cdef float bound = 1e10
+    cdef np.ndarray[float, ndim=2] scr = np.ones((SPHW+1, SPHW+1), dtype=np.float32) * bound
+    cdef np.ndarray[int, ndim=2] path = np.zeros((SPHW+1, SPHW+1), dtype=np.int32)
+    cdef float prev_cost
+    cdef np.ndarray[int, ndim=2] path_lengths = np.ones((SPHW+1, SPHW+1), dtype=np.int32) * SPHW
+
+    scr[0, 0] = 0
+    path_lengths[0, 0] = 0
+    cdef float value
+    cdef int xE = 0
+    cdef int yE = 0
+    cdef int N1 = feats1.shape[0]
+    cdef int N2 = feats2.shape[0]
+    assert feats1.shape[1] == feats2.shape[1]
+    cdef float subst_cost
+    cdef bint cont
+    cdef int i, j
+    cdef int dim = feats1.shape[1]
+    cdef int x, y
+    cdef np.ndarray[float, ndim=1] featx
+    cdef np.ndarray[float, ndim=1] featy
+
+    cdef int n_elt = 1
+    cdef np.ndarray[float, ndim=2] elts = np.empty(((SPHW+1)**2, 2), dtype=np.float32)
+    cdef np.ndarray[int, ndim=2] elts_idx = np.empty(((SPHW+1)**2, 2), dtype=np.int32)
+    elts[0] = 0, 0
+    elts_idx[0] = 0, 0
+
+    for i in range(1, SPHW+1):
+        cont = False
+        for j in range(max(1,i-R), min(SPHW+1,i+R)):
+
+            x = direction*i+xM
+            y = direction*j+yM
+
+            if ( x < 0 or x >= N1 or y < 0 or y >= N2 ):
+                continue
+
+            subst_cost = 0
+
+            featx = feats1[x]
+            featy = feats2[y]
+            if np.all(featx == 0) or np.all(featy == 0):
+                subst_cost = -1
+            else:
+                subst_cost = cosine(featx, featy)
+
+            subst_cost = (1-subst_cost)/2
+
+            if scr[i-1, j-1] <= scr[i-1, j] and scr[i-1, j-1] <= scr[i, j-1]:
+                prev_cost = scr[i-1, j-1]
+                path[i, j] = 1
+                if (strategy == 2):
+                    path_lengths[i, j] = path_lengths[i-1, j-1] + 1
+            elif scr[i-1, j] <= scr[i, j-1]:
+                prev_cost = scr[i-1, j]
+                path[i, j] = 2
+                if (strategy == 2):
+                    path_lengths[i, j] = path_lengths[i-1, j] + 1
+            else:
+                prev_cost = scr[i, j-1]
+                path[i, j] = 3
+                if (strategy == 2):
+                    path_lengths[i, j] = path_lengths[i, j-1] + 1
+
+            if (strategy == 0 or strategy == 2):
+                scr[i, j] = prev_cost + subst_cost
+            elif (strategy == 1):
+                scr[i, j] = alpha * prev_cost + (1 - alpha) * subst_cost
+
+            if strategy == 2:
+                value = scr[i, j]  / path_lengths[i, j]
+            else:
+                value = scr[i, j]
+
+            if i*i + j*j > MIN_LEN*MIN_LEN:
+                if value > castthr:
+                    scr[i, j] = bound
+                else:
+                    cont = True
+                    elts[n_elt, 0] = i*i+j*j
+                    elts[n_elt, 1] = value
+                    elts_idx[n_elt, 0] = i
+                    elts_idx[n_elt, 1] = j
+                    n_elt += 1
+            else:
+                cont = True
+
+        if not cont:
+            break
+
+
+    elts = elts[:n_elt]
+    elts_idx = elts_idx[:n_elt]
+    elts = (elts - np.mean(elts, axis=0)) / (np.std(elts, axis=0) + epsilon)
+    cdef np.ndarray[float, ndim=1] sum_elts
+    if with_dist:
+        sum_elts = elts[:, 0] - elts[:, 1]
+    else:
+        sum_elts =  - elts[:, 1]
+        # sort is n*log(n), min is n, do best method according to the length
+    # of the array and number of elements returned
+    cdef np.ndarray[long, ndim=1] sorted_idx = np.argsort(sum_elts)
+    return elts_idx[sorted_idx[n_elt-nbest:]]
+
+
 def rescore_matchlist(np.ndarray[Match, ndim=2] matchlist,
                       np.ndarray feats1,
                       np.ndarray feats2,
