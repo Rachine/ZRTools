@@ -74,6 +74,46 @@ def secondpass(np.ndarray[Match, ndim=1] matchlist, np.ndarray feats1, np.ndarra
 
 
 @cython.boundscheck(False)
+def secondpass_exact(np.ndarray[Match, ndim=1] matchlist, np.ndarray[float, ndim=2] feats1, np.ndarray[float, ndim=2] feats2, int R, float castthr, float trimthr, int strategy, int nbest=5, bool with_dist=True):
+    cdef np.ndarray[Match, ndim=2] new_matchlist = np.zeros((matchlist.shape[0], nbest**2,), dtype=[('xA', 'i4'), ('xB', 'i4'), ('yA', 'i4'), ('yB', 'i4'), ('rhoampl', 'f4'), ('score', 'f4')])
+    cdef int n_matches = 0
+    cdef float ALPHA = 0.5
+    cdef int N1 = feats1.shape[0]
+    cdef int N2 = feats2.shape[0]
+    cdef int xM, yM
+    cdef np.ndarray[int, ndim=1] xA, yA, xB, yB
+    cdef np.ndarray[int, ndim=2] resA, resB
+    cdef int i, j
+    for n in range(matchlist.shape[0]):
+        xM = int(0.5*(matchlist[n].xA+matchlist[n].xB))
+        yM = int(0.5*(matchlist[n].yA+matchlist[n].yB))
+      
+        resA = sig_find_paths_exact(feats1, feats2, -1, xM, yM, castthr, trimthr, R, strategy, ALPHA, nbest, with_dist);
+        resA = np.append(resA, np.zeros((nbest-resA.shape[0], 2), dtype=np.int32), axis=0)
+        xA = resA[:, 0]
+        yA = resA[:, 1]
+        xA = xM-xA
+        yA = yM-yA
+      
+        resB = sig_find_paths_exact(feats1, feats2, 1, xM, yM, castthr, trimthr, R, strategy, ALPHA, nbest, with_dist)
+        resB = np.append(resB, np.zeros((nbest-resB.shape[0], 2), dtype=np.int32), axis=0)
+        xB = resB[:, 0]
+        yB = resB[:, 1]
+        xB = xM+xB
+        yB = yM+yB
+
+        # assert np.all(xA >= 0) and np.all(yA >= 0) and np.all(xB < N1) and np.all(yB < N2)
+
+        for i in range(nbest):
+            for j in range(nbest):
+                new_matchlist[n,i*nbest + j].xA = max(xA[i], 0)
+                new_matchlist[n,i*nbest + j].xB = min(xB[j], N1-1)
+                new_matchlist[n,i*nbest + j].yA = max(yA[i], 0)
+                new_matchlist[n,i*nbest + j].yB = min(yB[j], N2-1)
+    return new_matchlist
+
+
+@cython.boundscheck(False)
 def secondpass_exact_aren(np.ndarray[Match, ndim=1] matchlist, np.ndarray[float, ndim=2] feats1, np.ndarray[float, ndim=2] feats2, int R, float castthr, float trimthr, int strategy, int nbest=5):
     cdef np.ndarray[FullMatch] new_matchlist = np.zeros((matchlist.shape[0],), dtype=[('xA', 'i4'), ('xB', 'i4'), ('yA', 'i4'), ('yB', 'i4'), ('dtw', 'f4'), ('length', 'f4'), ('disto', 'f4')])
     cdef int n_matches = 0

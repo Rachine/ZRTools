@@ -42,6 +42,7 @@ setup(name = 'ZRTools',
                     ["plebdisc_interface/py_secondpass.pyx"],
                     include_dirs=[np.get_include()])]),
       dependency_links=['https://github.com/bootphon/h5features'],
+      install_requires=['numba>=0.29.0']
       include_package_data=True,
       packages = find_packages()
 )
